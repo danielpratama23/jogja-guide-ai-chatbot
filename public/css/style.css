@@ -53,7 +53,6 @@ html, body {
     linear-gradient(160deg, #1a2535 0%, #0e1520 60%, #0a1018 100%);
   background-size: cover;
   background-position: center;
-  /* ↓ When you have a real photo, replace with: */
   background-image: url('/background-jogja.webp');
 }
 
@@ -648,4 +647,63 @@ html, body {
 @media (max-width: 480px) {
   .hero__strip { flex-wrap: wrap; }
   .strip__item { flex: 0 0 33.33%; border-bottom: 1px solid var(--border); }
+}
+
+/* ══════════════════════════════════════════════════════
+   MARKDOWN RENDERED INSIDE BOT BUBBLES
+══════════════════════════════════════════════════════ */
+.message--bot h1,
+.message--bot h2,
+.message--bot h3 {
+  color       : var(--white);
+  margin      : 14px 0 6px;
+  line-height : 1.3;
+}
+
+.message--bot h1 { font-size: 1.05rem; }
+.message--bot h2 { font-size: 0.97rem; border-bottom: 1px solid rgba(255,255,255,0.1); padding-bottom: 4px; }
+.message--bot h3 { font-size: 0.9rem;  color: var(--gold); }
+
+.message--bot p {
+  margin     : 0 0 8px;
+  line-height: 1.65;
+}
+
+.message--bot p:last-child { margin-bottom: 0; }
+
+.message--bot ul,
+.message--bot ol {
+  padding-left: 18px;
+  margin      : 6px 0 10px;
+  display     : flex;
+  flex-direction: column;
+  gap         : 4px;
+}
+
+.message--bot li {
+  font-size  : 0.84rem;
+  line-height: 1.6;
+  color      : rgba(255,255,255,0.85);
+}
+
+.message--bot ul li::marker { color: var(--gold); }
+.message--bot ol li::marker { color: var(--gold); font-weight: 600; }
+
+.message--bot strong { color: var(--white); font-weight: 600; }
+.message--bot em     { font-style: italic; color: rgba(255,255,255,0.75); }
+
+.message--bot code {
+  background   : rgba(255,255,255,0.1);
+  border       : 1px solid rgba(255,255,255,0.12);
+  border-radius: 4px;
+  padding      : 1px 6px;
+  font-size    : 0.8rem;
+  font-family  : 'Courier New', monospace;
+  color        : var(--gold);
+}
+
+.message--bot hr {
+  border    : none;
+  border-top: 1px solid rgba(255,255,255,0.1);
+  margin    : 10px 0;
 }

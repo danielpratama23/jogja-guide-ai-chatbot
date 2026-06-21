@@ -11,11 +11,87 @@
   const chatToggle = document.getElementById('chat-toggle');
   const closeBtn   = document.getElementById('chat-close');
   const openHero   = document.getElementById('open-chat-hero');
-  const chips      = document.getElementById('chips');
 
   // ── State ──────────────────────────────────────────────────────────────
   const conversation = [];
   let isOpen = false;
+
+  // ══════════════════════════════════════════════
+  // MARKDOWN → HTML (lightweight, no library)
+  // ══════════════════════════════════════════════
+  function parseMarkdown(text) {
+    // Escape raw HTML first to prevent XSS
+    let html = text
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;');
+
+    // --- Block-level ---
+
+    // Horizontal rule: ---
+    html = html.replace(/^---+$/gm, '<hr>');
+
+    // ### Heading 3
+    html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    // ## Heading 2
+    html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    // # Heading 1
+    html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+
+    // Unordered lists: lines starting with * or -
+    // Group consecutive list lines into <ul>
+    html = html.replace(/((?:^[ \t]*[-*][ \t].+\n?)+)/gm, (block) => {
+      const items = block
+        .trim()
+        .split('\n')
+        .map(line => line.replace(/^[ \t]*[-*][ \t]/, '').trim())
+        .filter(Boolean)
+        .map(item => `<li>${item}</li>`)
+        .join('');
+      return `<ul>${items}</ul>`;
+    });
+
+    // Ordered lists: lines starting with 1. 2. etc
+    html = html.replace(/((?:^[ \t]*\d+\.[ \t].+\n?)+)/gm, (block) => {
+      const items = block
+        .trim()
+        .split('\n')
+        .map(line => line.replace(/^[ \t]*\d+\.[ \t]/, '').trim())
+        .filter(Boolean)
+        .map(item => `<li>${item}</li>`)
+        .join('');
+      return `<ol>${items}</ol>`;
+    });
+
+    // --- Inline ---
+
+    // Bold+italic ***text***
+    html = html.replace(/\*\*\*(.+?)\*\*\*/g, '<strong><em>$1</em></strong>');
+    // Bold **text**
+    html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    // Italic *text* (only single asterisks not adjacent to list items)
+    html = html.replace(/(?<!\*)\*(?!\*)(.+?)(?<!\*)\*(?!\*)/g, '<em>$1</em>');
+    // Inline code `code`
+    html = html.replace(/`([^`]+)`/g, '<code>$1</code>');
+
+    // --- Paragraphs ---
+    // Wrap lines that aren't already block-level tags
+    const blockTags = /^<(h[1-3]|ul|ol|li|hr|blockquote)/;
+    html = html
+      .split('\n')
+      .map(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return ''; // blank → spacer handled below
+        if (blockTags.test(trimmed)) return trimmed;
+        return `<p>${trimmed}</p>`;
+      })
+      .join('\n');
+
+    // Collapse multiple blank lines → single break between blocks
+    html = html.replace(/(\n\s*){2,}/g, '\n');
+
+    return html;
+  }
 
   // ── Popover open/close ────────────────────────────────────────────────
   function openChat() {
@@ -35,26 +111,35 @@
     fab.classList.remove('hidden');
   }
 
-  fab.addEventListener('click', openChat);
+  fab?.addEventListener('click', openChat);
   chatToggle?.addEventListener('click', openChat);
   openHero?.addEventListener('click', openChat);
-  closeBtn.addEventListener('click', closeChat);
-  backdrop.addEventListener('click', closeChat);
-
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && isOpen) closeChat();
-  });
+  closeBtn?.addEventListener('click', closeChat);
+  backdrop?.addEventListener('click', closeChat);
+  document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && isOpen) closeChat(); });
 
   // ── Helpers ────────────────────────────────────────────────────────────
   function removeChips() {
-    chips?.remove();
+    document.getElementById('chips')?.remove();
   }
 
-  function appendMessage(role, text) {
+  // Append a user bubble (plain text, safe)
+  function appendUserMessage(text) {
     removeChips();
     const el = document.createElement('div');
-    el.classList.add('message', `message--${role}`);
-    el.textContent = text;
+    el.classList.add('message', 'message--user');
+    el.textContent = text; // plain text for user input
+    chatBox.appendChild(el);
+    chatBox.scrollTop = chatBox.scrollHeight;
+    return el;
+  }
+
+  // Append a bot bubble with rendered Markdown
+  function appendBotMessage(markdownText, isError = false) {
+    const el = document.createElement('div');
+    el.classList.add('message', 'message--bot');
+    if (isError) el.classList.add('message--error');
+    el.innerHTML = parseMarkdown(markdownText);
     chatBox.appendChild(el);
     chatBox.scrollTop = chatBox.scrollHeight;
     return el;
@@ -70,7 +155,7 @@
   }
 
   function setLoading(on) {
-    input.disabled  = on;
+    input.disabled   = on;
     sendBtn.disabled = on;
   }
 
@@ -81,7 +166,7 @@
 
     if (!isOpen) openChat();
 
-    appendMessage('user', text);
+    appendUserMessage(text);
     conversation.push({ role: 'user', text });
 
     setLoading(true);
@@ -103,7 +188,7 @@
       if (!data.result) throw new Error('Respons kosong dari server');
 
       thinkEl.remove();
-      appendMessage('bot', data.result);
+      appendBotMessage(data.result);
       conversation.push({ role: 'model', text: data.result });
 
     } catch (err) {
@@ -112,8 +197,7 @@
       const msg = err instanceof TypeError
         ? 'Gagal terhubung. Cek koneksimu ya!'
         : `Maaf, ada masalah: ${err.message}`;
-      const el = appendMessage('bot', msg);
-      el.classList.add('message--error');
+      appendBotMessage(msg, true);
       conversation.pop();
     } finally {
       setLoading(false);
@@ -136,7 +220,7 @@
     }
   });
 
-  // ── Quick chips ────────────────────────────────────────────────────────
+  // ── Quick chips + strip buttons ───────────────────────────────────────
   document.querySelectorAll('.chip, [data-prompt]').forEach((btn) => {
     btn.addEventListener('click', () => {
       const prompt = btn.dataset.prompt;
@@ -147,7 +231,7 @@
   });
 
   // ── Clear chat ─────────────────────────────────────────────────────────
-  clearBtn.addEventListener('click', () => {
+  clearBtn?.addEventListener('click', () => {
     conversation.length = 0;
     chatBox.innerHTML = `
       <div class="popover__welcome">
@@ -164,11 +248,8 @@
         <button class="chip" data-prompt="Apa oleh-oleh khas Jogja yang populer?">🎁 Oleh-oleh</button>
       </div>`;
 
-    // Re-bind chip events
     chatBox.querySelectorAll('.chip').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        sendMessage(btn.dataset.prompt);
-      });
+      btn.addEventListener('click', () => sendMessage(btn.dataset.prompt));
     });
 
     input.focus();
